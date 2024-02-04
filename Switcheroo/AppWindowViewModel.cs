@@ -5,6 +5,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Switcheroo.Core;
 
 namespace Switcheroo
@@ -16,18 +17,29 @@ namespace Switcheroo
             AppWindow = appWindow;
         }
 
+        public AppWindowViewModel(JToken tab, int port)
+        {
+            ChromeTab = tab;
+            AppWindow = AppWindow.CreateForChromeTab(
+                tab["title"].ToString(),
+                tab["url"].ToString(),
+                tab["id"].ToString(),
+                port);
+        }
+
         public AppWindow AppWindow { get; private set; }
+        private readonly JToken _chromeTab;
 
         #region IWindowText Members
 
         public string WindowTitle
         {
-            get { return AppWindow.Title; }
+            get { return AppWindow != null ? AppWindow.GetTitle() : _chromeTab["title"].ToString(); }
         }
 
         public string ProcessTitle
         {
-            get { return AppWindow.ProcessTitle; }
+            get { return AppWindow != null ? AppWindow.ProcessTitle : "Chrome"; }
         }
 
         #endregion
@@ -36,7 +48,7 @@ namespace Switcheroo
 
         public IntPtr HWnd
         {
-            get { return AppWindow.HWnd; }
+            get { return AppWindow != null ? AppWindow.HWnd : IntPtr.Zero; }
         }
 
         private string _formattedTitle;
@@ -64,6 +76,7 @@ namespace Switcheroo
         }
 
         private bool _isBeingClosed = false;
+        private JToken tab;
 
         public bool IsBeingClosed
         {
@@ -74,6 +87,8 @@ namespace Switcheroo
                 NotifyOfPropertyChange(() => IsBeingClosed);
             }
         }
+
+        public JToken ChromeTab { get; }
 
         #endregion
 

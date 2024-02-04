@@ -18,14 +18,18 @@
  * along with Switcheroo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.Caching;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using ManagedWinapi.Windows;
 
 namespace Switcheroo.Core
@@ -35,6 +39,33 @@ namespace Switcheroo.Core
     /// </summary>
     public class AppWindow : SystemWindow
     {
+        private bool IsChromeTab { get; set; }
+        private string ChromeTabTitle { get; set; }
+        private string ChromeTabUrl { get; set; }
+        private string ChromeTabId { get; set; }
+        private int ChromeTabPort { get; set; }
+
+        public static AppWindow CreateForChromeTab(string title, string url, string id, int port)
+        {
+            // Create a "fake" HWND. You need to ensure this doesn't clash with real HWNDs.
+            IntPtr fakeHwnd = new IntPtr(-1); // or some other special value that you can check for later
+
+            // Create a new instance of AppWindow with the fake HWND
+            var appWindow = new AppWindow(fakeHwnd)
+            {
+                IsChromeTab = true,
+                ChromeTabTitle = title,
+                ChromeTabUrl = url,
+                ChromeTabId = id,
+                ChromeTabPort = port
+            };
+
+            return appWindow;
+        }
+
+        public string GetTitle()
+        { return IsChromeTab ? ChromeTabTitle : base.Title; }
+
         public string ProcessTitle
         {
             get
@@ -96,8 +127,20 @@ namespace Switcheroo.Core
 
         public void SwitchToLastVisibleActivePopup()
         {
-            var lastActiveVisiblePopup = GetLastActiveVisiblePopup();
-            WinApi.SwitchToThisWindow(lastActiveVisiblePopup, true);
+            if (IsChromeTab)
+            {
+                Task.Run(async () => {
+                    var httpClient = new HttpClient();
+                    string endpoint = $"http://localhost:{ChromeTabPort}/json/activate/{ChromeTabId}";
+                    await httpClient.GetAsync(endpoint); // This activates the tab
+                });
+                
+            }
+            else
+            {
+                var lastActiveVisiblePopup = GetLastActiveVisiblePopup();
+                WinApi.SwitchToThisWindow(lastActiveVisiblePopup, true);
+            }
         }
 
         public AppWindow Owner
@@ -136,7 +179,7 @@ namespace Switcheroo.Core
 
         private bool HasWindowTitle()
         {
-            return !string.IsNullOrEmpty(Title);
+            return !string.IsNullOrEmpty(GetTitle());
         }
 
         private bool IsToolWindow()

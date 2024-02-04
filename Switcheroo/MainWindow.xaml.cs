@@ -24,6 +24,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
@@ -35,6 +36,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using ManagedWinapi;
 using ManagedWinapi.Windows;
+using Newtonsoft.Json.Linq;
 using Switcheroo.Core;
 using Switcheroo.Core.Matchers;
 using Switcheroo.Properties;
@@ -263,12 +265,19 @@ namespace Switcheroo
         /// </summary>
         private void LoadData(InitialFocus focus)
         {
+            Task.Run(() => LoadDataAsync(focus));
+        }
+
+        private async Task LoadDataAsync(InitialFocus focus)
+        {
             _unfilteredWindowList = new WindowFinder().GetWindows().Select(window => new AppWindowViewModel(window)).ToList();
+            await FindChromeTabs();
+            Console.WriteLine(_unfilteredWindowList.Count);
 
             var firstWindow = _unfilteredWindowList.FirstOrDefault();
 
             var foregroundWindowMovedToBottom = false;
-            
+
             // Move first window to the bottom of the list if it's related to the foreground window
             if (firstWindow != null && AreWindowsRelated(firstWindow.AppWindow, _foregroundWindow))
             {
@@ -282,9 +291,9 @@ namespace Switcheroo
 
             foreach (var window in _unfilteredWindowList)
             {
-                window.FormattedTitle = new XamlHighlighter().Highlight(new[] {new StringPart(window.AppWindow.Title)});
+                window.FormattedTitle = new XamlHighlighter().Highlight(new[] { new StringPart(window.AppWindow.GetTitle()) });
                 window.FormattedProcessTitle =
-                    new XamlHighlighter().Highlight(new[] {new StringPart(window.AppWindow.ProcessTitle)});
+                    new XamlHighlighter().Highlight(new[] { new StringPart(window.AppWindow.ProcessTitle) });
             }
 
             lb.DataContext = null;
@@ -296,6 +305,37 @@ namespace Switcheroo
             tb.Focus();
             CenterWindow();
             ScrollSelectedItemIntoView();
+        }
+
+        private readonly Dictionary<string, int> portTable = new Dictionary<string, int>
+        {
+            { "work", 9222 },
+            { "ed", 9223 },
+            { "personal", 9224 }
+        };
+        private async Task FindChromeTabs()
+        {
+            try
+            {
+                foreach (var kvp in portTable)
+                {
+                    var label = kvp.Key;
+                    var port = kvp.Value;
+
+                    var httpClient = new HttpClient();
+                    string responseBody = await httpClient.GetStringAsync($"http://localhost:{port}/json");
+                    JArray tabs = JArray.Parse(responseBody);
+
+                    foreach (var tab in tabs)
+                    {
+                        _unfilteredWindowList.Add(new AppWindowViewModel(tab, port));
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error fetching Chrome tabs: {e.Message}");
+            }
         }
 
         private static bool AreWindowsRelated(SystemWindow window1, SystemWindow window2)

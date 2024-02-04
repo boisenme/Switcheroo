@@ -38,10 +38,10 @@ namespace ManagedWinapi
         /// <param name="returnValue">The return value to test.</param>
         internal static int FailIfZero(int returnValue)
         {
-            if (returnValue == 0)
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            }
+            //if (returnValue == 0)
+            //{
+            //    throw new Win32Exception(Marshal.GetLastWin32Error());
+            //}
             return returnValue;
         }
 
